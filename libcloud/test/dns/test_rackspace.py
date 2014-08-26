@@ -34,7 +34,7 @@ class RackspaceUSTests(unittest.TestCase):
 
     def setUp(self):
         self.klass.connectionCls.conn_classes = (
-                None, RackspaceMockHttp)
+            None, RackspaceMockHttp)
         RackspaceMockHttp.type = None
         self.driver = self.klass(*DNS_PARAMS_RACKSPACE)
         self.driver.connection.poll_interval = 0.0
@@ -50,9 +50,9 @@ class RackspaceUSTests(unittest.TestCase):
         driver.list_zones()
 
         self.assertEqual(kwargs['ex_force_auth_token'],
-            driver.connection.auth_token)
+                         driver.connection.auth_token)
         self.assertEqual('/v1.0/11111',
-            driver.connection.request_path)
+                         driver.connection.request_path)
 
     def test_force_auth_url_kwargs(self):
         kwargs = {
@@ -62,9 +62,9 @@ class RackspaceUSTests(unittest.TestCase):
         driver = self.klass(*DNS_PARAMS_RACKSPACE, **kwargs)
 
         self.assertEqual(kwargs['ex_force_auth_url'],
-            driver.connection._ex_force_auth_url)
+                         driver.connection._ex_force_auth_url)
         self.assertEqual(kwargs['ex_force_auth_version'],
-            driver.connection._auth_version)
+                         driver.connection._auth_version)
 
     def test_gets_auth_2_0_endpoint(self):
         kwargs = {'ex_force_auth_version': '2.0_password'}
@@ -75,7 +75,7 @@ class RackspaceUSTests(unittest.TestCase):
 
     def test_list_record_types(self):
         record_types = self.driver.list_record_types()
-        self.assertEqual(len(record_types), 7)
+        self.assertEqual(len(record_types), 8)
         self.assertTrue(RecordType.A in record_types)
 
     def test_list_zones_success(self):
@@ -201,8 +201,8 @@ class RackspaceUSTests(unittest.TestCase):
         except Exception:
             e = sys.exc_info()[1]
             self.assertEqual(str(e), 'Validation errors: Domain TTL is ' +
-                                      'required and must be greater than ' +
-                                      'or equal to 300')
+                                     'required and must be greater than ' +
+                                     'or equal to 300')
         else:
             self.fail('Exception was not thrown')
 
@@ -301,18 +301,30 @@ class RackspaceUSTests(unittest.TestCase):
         domain = 'foo.bar'
         name = 'test'
         self.assertEqual(self.driver._to_full_record_name(domain, name),
-                          'test.foo.bar')
+                         'test.foo.bar')
 
     def test_to_full_record_name_name_not_provided(self):
         domain = 'foo.bar'
         name = None
         self.assertEqual(self.driver._to_full_record_name(domain, name),
-                          'foo.bar')
+                         'foo.bar')
+
+    def test_to_partial_record_name(self):
+        domain = 'example.com'
+        names = ['test.example.com', 'foo.bar.example.com',
+                 'example.com.example.com', 'example.com']
+        expected_values = ['test', 'foo.bar', 'example.com', None]
+
+        for name, expected_value in zip(names, expected_values):
+            value = self.driver._to_partial_record_name(domain=domain,
+                                                        name=name)
+            self.assertEqual(value, expected_value)
 
 
 class RackspaceUKTests(RackspaceUSTests):
     klass = RackspaceUKDNSDriver
     endpoint_url = 'https://lon.dns.api.rackspacecloud.com/v1.0/11111'
+
 
 class RackspaceMockHttp(MockHttp):
     fixtures = DNSFileFixtures('rackspace')
@@ -400,8 +412,7 @@ class RackspaceMockHttp(MockHttp):
         return (httplib.OK, body, self.base_headers,
                 httplib.responses[httplib.OK])
 
-    def _v1_0_11111_domains_12345678_records_28536_RECORD_DOES_NOT_EXIST(self,
-            method, url, body, headers):
+    def _v1_0_11111_domains_12345678_records_28536_RECORD_DOES_NOT_EXIST(self, method, url, body, headers):
         body = self.fixtures.load('does_not_exist.json')
         return (httplib.NOT_FOUND, body, self.base_headers,
                 httplib.responses[httplib.NOT_FOUND])
@@ -412,8 +423,7 @@ class RackspaceMockHttp(MockHttp):
         return (httplib.OK, body, self.base_headers,
                 httplib.responses[httplib.OK])
 
-    def _v1_0_11111_status_288795f9_e74d_48be_880b_a9e36e0de61e_CREATE_ZONE(self,
-            method, url, body, headers):
+    def _v1_0_11111_status_288795f9_e74d_48be_880b_a9e36e0de61e_CREATE_ZONE(self, method, url, body, headers):
         # Async status - create_zone
         body = self.fixtures.load('create_zone_success.json')
         return (httplib.OK, body, self.base_headers,

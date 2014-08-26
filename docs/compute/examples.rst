@@ -1,3 +1,5 @@
+:orphan:
+
 Compute Examples
 ================
 
@@ -112,15 +114,15 @@ Create a node on a CloudStack provider using a provided key pair and security gr
     This example assumes the provided key pair already exists. If the key pair
     doesn't exist yet, you can create it using the provider's own UI, or
     :func:`ex_create_keypair` driver method.
-    This functionality is currently only available in trunk.
+    This functionality is only available in Libcloud 0.14.0 and above.
 
 This example demonstrates how to create a node using an existing key pair.
 Created node also gets added to the provided security groups.
 
-.. literalinclude:: /examples/compute/create_cloudstack_node_keypair_secgroup.py
+.. literalinclude:: /examples/compute/cloudstack/create_cloudstack_node_keypair_secgroup.py
    :language: python
 
-Create flaoting IP and attach it to a node using a local OpenStack provider
+Create floating IP and attach it to a node using a local OpenStack provider
 ---------------------------------------------------------------------------
 
 This example demonstrates how to use OpenStack's floating IPs.

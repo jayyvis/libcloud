@@ -15,7 +15,7 @@
 Rackspace driver
 """
 from libcloud.compute.types import Provider, LibcloudError
-from libcloud.compute.base import NodeLocation
+from libcloud.compute.base import NodeLocation, VolumeSnapshot
 from libcloud.compute.drivers.openstack import OpenStack_1_0_Connection,\
     OpenStack_1_0_NodeDriver, OpenStack_1_0_Response
 from libcloud.compute.drivers.openstack import OpenStack_1_1_Connection,\
@@ -40,6 +40,10 @@ ENDPOINT_ARGS_MAP = {
     'syd': {'service_type': 'compute',
             'name': 'cloudServersOpenStack',
             'region': 'SYD'},
+    'hkg': {'service_type': 'compute',
+            'name': 'cloudServersOpenStack',
+            'region': 'HKG'},
+
 }
 
 
@@ -51,14 +55,13 @@ class RackspaceFirstGenConnection(OpenStack_1_0_Connection):
     XML_NAMESPACE = 'http://docs.rackspacecloud.com/servers/api/v1.0'
     auth_url = AUTH_URL
     _auth_version = '2.0'
+    cache_busting = True
 
     def __init__(self, *args, **kwargs):
         self.region = kwargs.pop('region', None)
         super(RackspaceFirstGenConnection, self).__init__(*args, **kwargs)
 
     def get_endpoint(self):
-        ep = {}
-
         if '2.0' in self._auth_version:
             ep = self.service_catalog.get_endpoint(service_type='compute',
                                                    name='cloudServers')
@@ -66,7 +69,7 @@ class RackspaceFirstGenConnection(OpenStack_1_0_Connection):
             raise LibcloudError(
                 'Auth version "%s" not supported' % (self._auth_version))
 
-        public_url = ep.get('publicURL', None)
+        public_url = ep.url
 
         if not public_url:
             raise LibcloudError('Could not find specified endpoint')
@@ -160,7 +163,7 @@ class RackspaceConnection(OpenStack_1_1_Connection):
             raise LibcloudError(
                 'Auth version "%s" not supported' % (self._auth_version))
 
-        public_url = ep.get('publicURL', None)
+        public_url = ep.url
 
         if not public_url:
             raise LibcloudError('Could not find specified endpoint')
@@ -201,6 +204,21 @@ class RackspaceNodeDriver(OpenStack_1_1_NodeDriver):
                                                   port=port,
                                                   region=region,
                                                   **kwargs)
+
+    def _to_snapshot(self, api_node):
+        if 'snapshot' in api_node:
+            api_node = api_node['snapshot']
+
+        extra = {'volume_id': api_node['volumeId'],
+                 'name': api_node['displayName'],
+                 'created': api_node['createdAt'],
+                 'description': api_node['displayDescription'],
+                 'status': api_node['status']}
+
+        snapshot = VolumeSnapshot(id=api_node['id'], driver=self,
+                                  size=api_node['size'],
+                                  extra=extra)
+        return snapshot
 
     def _ex_connection_class_kwargs(self):
         endpoint_args = ENDPOINT_ARGS_MAP[self.region]

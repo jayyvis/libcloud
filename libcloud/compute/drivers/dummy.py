@@ -24,6 +24,7 @@ import struct
 from libcloud.common.base import ConnectionKey
 from libcloud.compute.base import NodeImage, NodeSize, Node
 from libcloud.compute.base import NodeDriver, NodeLocation
+from libcloud.compute.base import KeyPair
 from libcloud.compute.types import Provider, NodeState
 
 
@@ -145,7 +146,7 @@ class DummyNodeDriver(NodeDriver):
         's1'
         >>> node.image.id
         'i2'
-        >>> sorted([node.name for node in driver.list_nodes()])
+        >>> sorted([n.name for n in driver.list_nodes()])
         ['dummy-1', 'dummy-2', 'dummy-3']
 
         @inherits: :class:`NodeDriver.list_nodes`
@@ -185,14 +186,15 @@ class DummyNodeDriver(NodeDriver):
         >>> from libcloud.compute.drivers.dummy import DummyNodeDriver
         >>> driver = DummyNodeDriver(0)
         >>> from libcloud.compute.types import NodeState
-        >>> node = [node for node in driver.list_nodes() if node.name == 'dummy-1'][0]
+        >>> node = [node for node in driver.list_nodes() if
+        ...         node.name == 'dummy-1'][0]
         >>> node.state == NodeState.RUNNING
         True
         >>> driver.destroy_node(node)
         True
         >>> node.state == NodeState.RUNNING
         False
-        >>> [node for node in driver.list_nodes() if node.name == 'dummy-1']
+        >>> [n for n in driver.list_nodes() if n.name == 'dummy-1']
         []
 
         @inherits: :class:`NodeDriver.destroy_node`
@@ -268,7 +270,8 @@ class DummyNodeDriver(NodeDriver):
 
         >>> from libcloud.compute.drivers.dummy import DummyNodeDriver
         >>> driver = DummyNodeDriver(0)
-        >>> sorted([loc.name + " in " + loc.country for loc in driver.list_locations()])
+        >>> sorted([loc.name + " in " + loc.country for loc in
+        ...         driver.list_locations()])
         ['Island Datacenter in FJ', 'London Loft in GB', "Paul's Room in US"]
 
         @inherits: :class:`NodeDriver.list_locations`
@@ -323,6 +326,14 @@ class DummyNodeDriver(NodeDriver):
                  extra={'foo': 'bar'})
         self.nl.append(n)
         return n
+
+    def import_key_pair_from_string(self, name, key_material):
+        key_pair = KeyPair(name=name,
+                           public_key=key_material,
+                           fingerprint='fingerprint',
+                           private_key='private_key',
+                           driver=self)
+        return key_pair
 
 
 def _ip_to_int(ip):

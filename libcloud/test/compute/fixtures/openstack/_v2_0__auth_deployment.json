@@ -2,7 +2,7 @@
     "access": {
         "token": {
             "id": "aaaaaaaaaaaa-bbb-cccccccccccccc",
-            "expires": "2011-11-23T21:00:14.000-06:00"
+            "expires": "2031-11-23T21:00:14.000-06:00"
         },
         "serviceCatalog": [
             {
@@ -19,7 +19,7 @@
                     }
                 ],
                 "name": "cloudFilesCDN",
-                "type": "object-store"
+                "type": "rax:object-cdn"
             },
             {
                 "endpoints": [
@@ -101,7 +101,16 @@
                         "versionInfo": "https://syd.servers.api.rackspacecloud.com/v2/",
                         "versionList": "https://syd.servers.api.rackspacecloud.com/",
                         "versionId": "2"
+                    },
+                    {
+                        "region": "HKG",
+                        "tenantId": "613469",
+                        "publicURL": "https://hkg.servers.api.rackspacecloud.com/v2/slug",
+                        "versionInfo": "https://hkg.servers.api.rackspacecloud.com/v2/",
+                        "versionList": "https://hkg.servers.api.rackspacecloud.com/",
+                        "versionId": "2"
                     }
+
 
                 ],
                 "name": "cloudServersOpenStack",

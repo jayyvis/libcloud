@@ -55,8 +55,7 @@ class AbiquoNodeDriver(NodeDriver):
         """
         Initializes Abiquo Driver
 
-        Initializes the :class:`NodeDriver` object. After that, it generates the
-        context
+        Initializes the :class:`NodeDriver` object and populate the cache.
 
         :param       user_id: identifier of Abiquo user (required)
         :type        user_id: ``str``
@@ -69,7 +68,7 @@ class AbiquoNodeDriver(NodeDriver):
         super(AbiquoNodeDriver, self).__init__(key=user_id, secret=secret,
                                                secure=False, host=None,
                                                port=None, **kwargs)
-        self.ex_set_context()
+        self.ex_populate_cache()
 
     def create_node(self, **kwargs):
         """
@@ -100,7 +99,7 @@ class AbiquoNodeDriver(NodeDriver):
         :type       image:  :class:`NodeImage`
 
         :keyword    location: Which data center to create a node in. If empty,
-                              undefined behavoir will be selected. (optional)
+                              undefined behavior will be selected. (optional)
         :type       location: :class:`NodeLocation`
 
         :keyword   group_name:  Which group this node belongs to. If empty,
@@ -220,9 +219,9 @@ class AbiquoNodeDriver(NodeDriver):
         e_vm = self.connection.request(edit_vm, headers=headers).object
         return self._to_node(e_vm, self)
 
-    def ex_set_context(self):
+    def ex_populate_cache(self):
         """
-        Generates the context
+        Populate the cache.
 
         For each connection, it is good to store some objects that will be
         useful for further requests, such as the 'user' and the 'enterprise'
@@ -230,7 +229,7 @@ class AbiquoNodeDriver(NodeDriver):
 
         Executes the 'login' resource after setting the connection parameters
         and, if the execution is successful, it sets the 'user' object into
-        context. After that, it also requests for the 'enterprise' and
+        cache. After that, it also requests for the 'enterprise' and
         'locations' data.
 
         List of locations should remain the same for a single libcloud
@@ -238,11 +237,11 @@ class AbiquoNodeDriver(NodeDriver):
         refresh the list of locations any time.
         """
         user = self.connection.request('/login').object
-        self.connection.context['user'] = user
-        e_ent = get_href(self.connection.context['user'],
+        self.connection.cache['user'] = user
+        e_ent = get_href(self.connection.cache['user'],
                          'enterprise')
         ent = self.connection.request(e_ent).object
-        self.connection.context['enterprise'] = ent
+        self.connection.cache['enterprise'] = ent
 
         uri_vdcs = '/cloud/virtualdatacenters'
         e_vdcs = self.connection.request(uri_vdcs).object
@@ -256,17 +255,18 @@ class AbiquoNodeDriver(NodeDriver):
             key = get_href(dc, 'edit')
             dc_dict[key] = dc
 
-        # Set the context for the locations
-        self.connection.context['locations'] = {}
+        # Populate locations cache
+        self.connection.cache['locations'] = {}
         for e_vdc in e_vdcs.findall('virtualDatacenter'):
             dc_link = get_href(e_vdc, 'datacenter')
             loc = self._to_location(e_vdc, dc_dict[dc_link], self)
 
-            # Save into context the link to the itself because we will need
+            # Save into cache the link to the itself because we will need
             # it in the future, but we save here to don't extend the class
             # :class:`NodeLocation`.
-            # So here we have the dict: :class:`NodeLocation` -> link_datacenter
-            self.connection.context['locations'][loc] = get_href(e_vdc, 'edit')
+            # So here we have the dict: :class:`NodeLocation` ->
+            # link_datacenter
+            self.connection.cache['locations'][loc] = get_href(e_vdc, 'edit')
 
     def ex_create_group(self, name, location=None):
         """
@@ -274,8 +274,8 @@ class AbiquoNodeDriver(NodeDriver):
 
         You can specify the location as well.
 
-        :param     name:     name of the group (required)
-        :type      name:     ``str``
+        :param     group:     name of the group (required)
+        :type      group:     ``str``
 
         :param     location: location were to create the group
         :type      location: :class:`NodeLocation`
@@ -290,10 +290,10 @@ class AbiquoNodeDriver(NodeDriver):
 
         if location is None:
             location = self.list_locations()[0]
-        elif not location in self.list_locations():
+        elif location not in self.list_locations():
             raise LibcloudError('Location does not exist')
 
-        link_vdc = self.connection.context['locations'][location]
+        link_vdc = self.connection.cache['locations'][location]
         e_vdc = self.connection.request(link_vdc).object
 
         creation_link = get_href(e_vdc, 'virtualappliances')
@@ -310,11 +310,11 @@ class AbiquoNodeDriver(NodeDriver):
         """
         Destroy a group.
 
-        Be careful! Destroying a group means destroying all the :class:`Node`s there
-        and the group itself!
+        Be careful! Destroying a group means destroying all the :class:`Node`s
+        there and the group itself!
 
-        If there is currently any action over any :class:`Node` of the :class:`NodeGroup`,
-        then the method will raise an exception.
+        If there is currently any action over any :class:`Node` of the
+        :class:`NodeGroup`, then the method will raise an exception.
 
         :param     name: The group (required)
         :type      name: :class:`NodeGroup`
@@ -365,7 +365,7 @@ class AbiquoNodeDriver(NodeDriver):
         """
         groups = []
         for vdc in self._get_locations(location):
-            link_vdc = self.connection.context['locations'][vdc]
+            link_vdc = self.connection.cache['locations'][vdc]
             e_vdc = self.connection.request(link_vdc).object
             apps_link = get_href(e_vdc, 'virtualappliances')
             vapps = self.connection.request(apps_link).object
@@ -403,7 +403,7 @@ class AbiquoNodeDriver(NodeDriver):
             # is different from the 'datacenterRepository' element
             for vdc in self._get_locations(location):
                 # Check if the virtual datacenter belongs to this repo
-                link_vdc = self.connection.context['locations'][vdc]
+                link_vdc = self.connection.cache['locations'][vdc]
                 e_vdc = self.connection.request(link_vdc).object
                 dc_link_vdc = get_href(e_vdc, 'datacenter')
                 dc_link_repo = get_href(repo, 'datacenter')
@@ -430,10 +430,11 @@ class AbiquoNodeDriver(NodeDriver):
         """
         Return list of locations where the user has access to.
 
-        :return: the list of :class:`NodeLocation` available for the current user
+        :return: the list of :class:`NodeLocation` available for the current
+                 user
         :rtype:  ``list`` of :class:`NodeLocation`
         """
-        return list(self.connection.context['locations'].keys())
+        return list(self.connection.cache['locations'].keys())
 
     def list_nodes(self, location=None):
         """
@@ -457,11 +458,12 @@ class AbiquoNodeDriver(NodeDriver):
         List sizes on a provider.
 
         Abiquo does not work with sizes. However, this method
-        returns a list of predefined ones (copied from :class:`DummyNodeDriver` but
-        without price neither bandwidth) to help the users to create their own.
+        returns a list of predefined ones (copied from :class:`DummyNodeDriver`
+        but without price neither bandwidth) to help the users to create their
+        own.
 
-        If you call the method :class:`AbiquoNodeDriver.create_node` with the size
-        informed, it will just override the 'ram' value of the 'image'
+        If you call the method :class:`AbiquoNodeDriver.create_node` with the
+        size informed, it will just override the 'ram' value of the 'image'
         template. So it is no too much usefull work with sizes...
 
         :return: The list of sizes
@@ -571,7 +573,7 @@ class AbiquoNodeDriver(NodeDriver):
         repo_link = get_href(image_element, 'datacenterrepository')
         image = self._to_nodeimage(image_element, self, repo_link)
 
-        ## Fill the 'ips' data
+        # Fill the 'ips' data
         private_ips = []
         public_ips = []
         nics_element = self.connection.request(get_href(vm, 'nics')).object
@@ -618,7 +620,7 @@ class AbiquoNodeDriver(NodeDriver):
         """
         Returns the identifier of the logged user's enterprise.
         """
-        return self.connection.context['enterprise'].findtext('id')
+        return self.connection.cache['enterprise'].findtext('id')
 
     def _define_create_node_location(self, **kwargs):
         """
@@ -628,7 +630,7 @@ class AbiquoNodeDriver(NodeDriver):
         location will be created.
         """
         # First, get image location
-        if not 'image' in kwargs:
+        if 'image' not in kwargs:
             error = "'image' parameter is mandatory"
             raise LibcloudError(error, self)
 
@@ -638,7 +640,7 @@ class AbiquoNodeDriver(NodeDriver):
         location = None
         if 'location' in kwargs:
             location = kwargs['location']
-            if not location in self.list_locations():
+            if location not in self.list_locations():
                 raise LibcloudError('Location does not exist')
 
         # Check if the image is compatible with any of the locations or
@@ -646,7 +648,7 @@ class AbiquoNodeDriver(NodeDriver):
         loc = None
         target_loc = None
         for candidate_loc in self._get_locations(location):
-            link_vdc = self.connection.context['locations'][candidate_loc]
+            link_vdc = self.connection.cache['locations'][candidate_loc]
             e_vdc = self.connection.request(link_vdc).object
             # url_location = get_href(e_vdc, 'datacenter')
             for img in self.list_images(candidate_loc):
@@ -667,7 +669,7 @@ class AbiquoNodeDriver(NodeDriver):
 
         If we can not find any group, create it into argument 'location'
         """
-        if not 'group_name' in kwargs:
+        if 'group_name' not in kwargs:
             group_name = NodeGroup.DEFAULT_GROUP_NAME
         else:
             group_name = kwargs['group_name']
@@ -727,8 +729,9 @@ class NodeGroup(object):
 
     All :class:`Node`s in Abiquo must be defined inside a Virtual Appliance.
     We offer a way to handle virtual appliances (called NodeGroup to
-    maintain some kind of name conventions here) inside the :class:`AbiquoNodeDriver`
-    without breaking compatibility of the rest of libcloud API.
+    maintain some kind of name conventions here) inside the
+    :class:`AbiquoNodeDriver` without breaking compatibility of the rest of
+    libcloud API.
 
     If the user does not want to handle groups, all the virtual machines
     will be created inside a group named 'libcloud'
@@ -750,6 +753,7 @@ class NodeGroup(object):
 
     def destroy(self):
         """
-        Destroys the group delegating the execution to :class:`AbiquoNodeDriver`.
+        Destroys the group delegating the execution to
+        :class:`AbiquoNodeDriver`.
         """
         return self.driver.ex_destroy_group(self)

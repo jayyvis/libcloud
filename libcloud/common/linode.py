@@ -31,17 +31,15 @@ __all__ = [
 API_HOST = 'api.linode.com'
 API_ROOT = '/'
 
-# Constants that map a RAM figure to a PlanID (updated 6/28/10)
-LINODE_PLAN_IDS = {512: '1',
-                   768: '2',
-                  1024: '3',
-                  1536: '4',
-                  2048: '5',
-                  4096: '6',
-                  8192: '7',
-                 12288: '8',
-                 16384: '9',
-                 20480: '10'}
+# Constants that map a RAM figure to a PlanID (updated 4/25/14)
+LINODE_PLAN_IDS = {2048: '1',
+                   4096: '3',
+                   8192: '5',
+                   16384: '6',
+                   32768: '7',
+                   49152: '8',
+                   65536: '9',
+                   98304: '11'}
 
 
 class LinodeException(Exception):
@@ -82,21 +80,34 @@ class LinodeResponse(JsonResponse):
 
         :keyword response: The raw response returned by urllib
         :return: parsed :class:`LinodeResponse`"""
-        self.body = self._decompress_response(response=response)
+
+        self.connection = connection
+
+        self.headers = dict(response.getheaders())
+        self.error = response.reason
+        self.status = response.status
+
+        # This attribute is set when using LoggingConnection.
+        original_data = getattr(response, '_original_data', None)
+
+        if original_data:
+            # LoggingConnection already decompresses data so it can log it
+            # which means we don't need to decompress it here.
+            self.body = response._original_data
+        else:
+            self.body = self._decompress_response(body=response.read(),
+                                                  headers=self.headers)
 
         if PY3:
             self.body = b(self.body).decode('utf-8')
 
-        self.status = response.status
-        self.headers = dict(response.getheaders())
-        self.error = response.reason
-        self.connection = connection
         self.invalid = LinodeException(0xFF,
                                        "Invalid JSON received from server")
 
         # Move parse_body() to here;  we can't be sure of failure until we've
         # parsed the body into JSON.
         self.objects, self.errors = self.parse_body()
+
         if not self.success():
             # Raise the first error, as there will usually only be one
             raise self.errors[0]
@@ -118,7 +129,7 @@ class LinodeResponse(JsonResponse):
             errs = []
             for obj in js:
                 if ("DATA" not in obj or "ERRORARRAY" not in obj
-                    or "ACTION" not in obj):
+                        or "ACTION" not in obj):
                     ret.append(None)
                     errs.append(self.invalid)
                     continue

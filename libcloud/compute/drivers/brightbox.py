@@ -68,21 +68,23 @@ class BrightboxNodeDriver(NodeDriver):
                                      'started_at', 'created_at',
                                      'deleted_at'])
         extra_data['zone'] = self._to_location(data['zone'])
+
+        ipv6_addresses = [interface['ipv6_address'] for interface
+                          in data['interfaces'] if 'ipv6_address' in interface]
+
+        private_ips = [interface['ipv4_address']
+                       for interface in data['interfaces']
+                       if 'ipv4_address' in interface]
+
+        public_ips = [cloud_ip['public_ip'] for cloud_ip in data['cloud_ips']]
+        public_ips += ipv6_addresses
+
         return Node(
             id=data['id'],
             name=data['name'],
             state=self.NODE_STATE_MAP[data['status']],
-
-            private_ips=[interface['ipv4_address']
-                         for interface in data['interfaces']
-                         if 'ipv4_address' in interface],
-
-            public_ips=[cloud_ip['public_ip']
-                        for cloud_ip in data['cloud_ips']] +
-                        [interface['ipv6_address']
-                        for interface in data['interfaces']
-                        if 'ipv6_address' in interface],
-
+            private_ips=private_ips,
+            public_ips=public_ips,
             driver=self.connection.driver,
             size=self._to_size(data['server_type']),
             image=self._to_image(data['image']),
@@ -119,12 +121,15 @@ class BrightboxNodeDriver(NodeDriver):
         )
 
     def _to_location(self, data):
-        return NodeLocation(
-            id=data['id'],
-            name=data['handle'],
-            country='GB',
-            driver=self
-        )
+        if data:
+            return NodeLocation(
+                id=data['id'],
+                name=data['handle'],
+                country='GB',
+                driver=self
+            )
+        else:
+            return None
 
     def _post(self, path, data={}):
         headers = {'Content-Type': 'application/json'}
@@ -181,7 +186,7 @@ class BrightboxNodeDriver(NodeDriver):
         data = self.connection.request('/%s/servers' % self.api_version).object
         return list(map(self._to_node, data))
 
-    def list_images(self):
+    def list_images(self, location=None):
         data = self.connection.request('/%s/images' % self.api_version).object
         return list(map(self._to_image, data))
 

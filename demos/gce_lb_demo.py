@@ -72,7 +72,7 @@ from libcloud.loadbalancer.providers import get_driver as get_driver_lb
 DEMO_BASE_NAME = 'libcloud-lb-demo'
 
 # Datacenter to create resources in
-DATACENTER = 'us-central1-b'
+DATACENTER = 'us-central1-a'
 
 # Clean up resources at the end (can be set to false in order to
 # inspect resources at the end of the run). Resources will be cleaned
@@ -96,7 +96,7 @@ def get_gce_driver():
 def get_gcelb_driver(gce_driver=None):
     # The GCE Load Balancer driver uses the GCE Compute driver for all of its
     # API calls.  You can either provide the driver directly, or provide the
-    # same authentication information so the the LB driver can get its own
+    # same authentication information so the LB driver can get its own
     # Compute driver.
     if gce_driver:
         driver = get_driver_lb(Provider_lb.GCE)(gce_driver=gce_driver)
@@ -120,7 +120,7 @@ def display(title, resource_list):
         print('   %s' % item.name)
 
 
-def clean_up(base_name, node_list=None, resource_list=None):
+def clean_up(gce, base_name, node_list=None, resource_list=None):
     """
     Destroy all resources that have a name beginning with 'base_name'.
 
@@ -162,7 +162,6 @@ def clean_up(base_name, node_list=None, resource_list=None):
 
 # ==== DEMO CODE STARTS HERE ====
 def main():
-    global gce  # Used by the clean_up function
     gce = get_gce_driver()
     gcelb = get_gcelb_driver(gce)
 
@@ -187,7 +186,8 @@ def main():
     all_nodes = gce.list_nodes(ex_zone='all')
     firewalls = gce.ex_list_firewalls()
     print('Cleaning up any "%s" resources:' % DEMO_BASE_NAME)
-    clean_up(DEMO_BASE_NAME, all_nodes, balancers + healthchecks + firewalls)
+    clean_up(gce, DEMO_BASE_NAME, all_nodes,
+             balancers + healthchecks + firewalls)
 
     # == Create 3 nodes to balance between ==
     startup_script = ('apt-get -y update && '
@@ -202,7 +202,8 @@ def main():
                            'value': startup_script}]}
     lb_nodes = gce.ex_create_multiple_nodes(base_name, size, image,
                                             number, ex_tags=[tag],
-                                            ex_metadata=metadata)
+                                            ex_metadata=metadata,
+                                            ignore_errors=False)
     display('Created Nodes', lb_nodes)
 
     # == Create a Firewall for instances ==
@@ -296,7 +297,8 @@ def main():
         firewalls = gce.ex_list_firewalls()
 
         print('Cleaning up %s resources created.' % DEMO_BASE_NAME)
-        clean_up(DEMO_BASE_NAME, nodes, balancers + healthchecks + firewalls)
+        clean_up(gce, DEMO_BASE_NAME, nodes,
+                 balancers + healthchecks + firewalls)
 
 if __name__ == '__main__':
     main()

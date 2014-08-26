@@ -89,8 +89,8 @@ class LinodeNodeDriver(NodeDriver):
 
     # Converts Linode's state from DB to a NodeState constant.
     LINODE_STATES = {
-        -2: NodeState.UNKNOWN,    # Boot Failed
-        -1: NodeState.PENDING,    # Being Created
+        (-2): NodeState.UNKNOWN,    # Boot Failed
+        (-1): NodeState.PENDING,    # Being Created
         0: NodeState.PENDING,     # Brand New
         1: NodeState.RUNNING,     # Running
         2: NodeState.TERMINATED,  # Powered Off
@@ -244,7 +244,7 @@ class LinodeNodeDriver(NodeDriver):
 
         if not ssh and not root:
             raise LinodeException(0xFB, "Need SSH key or root password")
-        if not root is None and len(root) < 6:
+        if root is not None and len(root) < 6:
             raise LinodeException(0xFB, "Root password is too short")
 
         # Swap size
@@ -270,9 +270,11 @@ class LinodeNodeDriver(NodeDriver):
             kernel = kwargs["ex_kernel"]
         else:
             if image.extra['64bit']:
-                kernel = 111 if image.extra['pvops'] else 107
+                # For a list of available kernel ids, see
+                # https://www.linode.com/kernels/
+                kernel = 138
             else:
-                kernel = 110 if image.extra['pvops'] else 60
+                kernel = 137
         params = {"api_action": "avail.kernels"}
         kernels = self.connection.request(API_ROOT, params=params).objects[0]
         if kernel not in [z["KERNELID"] for z in kernels]:
@@ -281,16 +283,6 @@ class LinodeNodeDriver(NodeDriver):
         # Comments
         comments = "Created by Apache libcloud <http://www.libcloud.org>" if\
             "ex_comment" not in kwargs else kwargs["ex_comment"]
-
-        # Labels
-        label = {
-            "lconfig": "[%s] Configuration Profile" % name,
-            "lroot": "[%s] %s Disk Image" % (name, image.name),
-            "lswap": "[%s] Swap Space" % name
-        }
-        for what in ["lconfig", "lroot", "lswap"]:
-            if what in kwargs:
-                label[what] = kwargs[what]
 
         # Step 1: linode.create
         params = {
@@ -317,6 +309,18 @@ class LinodeNodeDriver(NodeDriver):
                 "LinodeID": linode["id"]
             }
             self.connection.request(API_ROOT, params=params)
+
+        # Step 1d. Labels
+        # use the linode id as the name can be up to 63 chars and the labels
+        # are limited to 48 chars
+        label = {
+            "lconfig": "[%s] Configuration Profile" % linode["id"],
+            "lroot": "[%s] %s Disk Image" % (linode["id"], image.name),
+            "lswap": "[%s] Swap Space" % linode["id"]
+        }
+        for what in ["lconfig", "lroot", "lswap"]:
+            if what in kwargs:
+                label[what] = kwargs[what]
 
         # Step 2: linode.disk.createfromdistribution
         if not root:
@@ -455,8 +459,9 @@ class LinodeNodeDriver(NodeDriver):
         Set the default datacenter for Linode creation
 
         Since Linodes must be created in a facility, this function sets the
-        default that :class:`create_node` will use.  If a location keyword is not
-        passed to :class:`create_node`, this method must have already been used.
+        default that :class:`create_node` will use.  If a location keyword is
+        not passed to :class:`create_node`, this method must have already been
+        used.
 
         :keyword dc: the datacenter to create Linodes in unless specified
         :type dc: :class:`NodeLocation`

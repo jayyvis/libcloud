@@ -17,20 +17,29 @@
 from __future__ import absolute_import
 from __future__ import with_statement
 
+import os
 import sys
-import unittest
+import tempfile
 
+from libcloud import _init_once
+from libcloud.test import LibcloudTestCase
+from libcloud.test import unittest
 from libcloud.compute.ssh import ParamikoSSHClient
 from libcloud.compute.ssh import ShellOutSSHClient
 from libcloud.compute.ssh import have_paramiko
 
+from libcloud.utils.py3 import StringIO
+
 from mock import patch, Mock
 
 if not have_paramiko:
-    ParamikoSSHClient = None
+    ParamikoSSHClient = None  # NOQA
+else:
+    import paramiko
 
 
-class ParamikoSSHClientTests(unittest.TestCase):
+class ParamikoSSHClientTests(LibcloudTestCase):
+
     @patch('paramiko.SSHClient', Mock)
     def setUp(self):
         """
@@ -41,16 +50,13 @@ class ParamikoSSHClientTests(unittest.TestCase):
                        'username': 'ubuntu',
                        'key': '~/.ssh/ubuntu_ssh',
                        'timeout': '600'}
+        _, self.tmp_file = tempfile.mkstemp()
+        os.environ['LIBCLOUD_DEBUG'] = self.tmp_file
+        _init_once()
         self.ssh_cli = ParamikoSSHClient(**conn_params)
 
     @patch('paramiko.SSHClient', Mock)
     def test_create_with_password(self):
-        """
-        Initialize object with password.
-
-        Just to have better coverage, initialize the object
-        with the 'password' value instead of the 'key'.
-        """
         conn_params = {'hostname': 'dummy.host.org',
                        'username': 'ubuntu',
                        'password': 'ubuntu'}
@@ -64,6 +70,107 @@ class ParamikoSSHClientTests(unittest.TestCase):
                          'look_for_keys': False,
                          'port': 22}
         mock.client.connect.assert_called_once_with(**expected_conn)
+        self.assertLogMsg('Connecting to server')
+
+    @patch('paramiko.SSHClient', Mock)
+    def test_deprecated_key_argument(self):
+        conn_params = {'hostname': 'dummy.host.org',
+                       'username': 'ubuntu',
+                       'key': 'id_rsa'}
+        mock = ParamikoSSHClient(**conn_params)
+        mock.connect()
+
+        expected_conn = {'username': 'ubuntu',
+                         'allow_agent': False,
+                         'hostname': 'dummy.host.org',
+                         'look_for_keys': False,
+                         'key_filename': 'id_rsa',
+                         'port': 22}
+        mock.client.connect.assert_called_once_with(**expected_conn)
+        self.assertLogMsg('Connecting to server')
+
+    def test_key_files_and_key_material_arguments_are_mutual_exclusive(self):
+        conn_params = {'hostname': 'dummy.host.org',
+                       'username': 'ubuntu',
+                       'key_files': 'id_rsa',
+                       'key_material': 'key'}
+
+        expected_msg = ('key_files and key_material arguments are mutually '
+                        'exclusive')
+        self.assertRaisesRegexp(ValueError, expected_msg,
+                                ParamikoSSHClient, **conn_params)
+
+    @patch('paramiko.SSHClient', Mock)
+    def test_key_material_argument(self):
+        path = os.path.join(os.path.dirname(__file__),
+                            'fixtures', 'misc', 'dummy_rsa')
+
+        with open(path, 'r') as fp:
+            private_key = fp.read()
+
+        conn_params = {'hostname': 'dummy.host.org',
+                       'username': 'ubuntu',
+                       'key_material': private_key}
+        mock = ParamikoSSHClient(**conn_params)
+        mock.connect()
+
+        pkey = paramiko.RSAKey.from_private_key(StringIO(private_key))
+        expected_conn = {'username': 'ubuntu',
+                         'allow_agent': False,
+                         'hostname': 'dummy.host.org',
+                         'look_for_keys': False,
+                         'pkey': pkey,
+                         'port': 22}
+        mock.client.connect.assert_called_once_with(**expected_conn)
+        self.assertLogMsg('Connecting to server')
+
+    @patch('paramiko.SSHClient', Mock)
+    def test_key_material_argument_invalid_key(self):
+        conn_params = {'hostname': 'dummy.host.org',
+                       'username': 'ubuntu',
+                       'key_material': 'id_rsa'}
+
+        mock = ParamikoSSHClient(**conn_params)
+
+        expected_msg = 'Invalid or unsupported key type'
+        self.assertRaisesRegexp(paramiko.ssh_exception.SSHException,
+                                expected_msg, mock.connect)
+
+    @patch('paramiko.SSHClient', Mock)
+    def test_create_with_key(self):
+        conn_params = {'hostname': 'dummy.host.org',
+                       'username': 'ubuntu',
+                       'key_files': 'id_rsa'}
+        mock = ParamikoSSHClient(**conn_params)
+        mock.connect()
+
+        expected_conn = {'username': 'ubuntu',
+                         'allow_agent': False,
+                         'hostname': 'dummy.host.org',
+                         'look_for_keys': False,
+                         'key_filename': 'id_rsa',
+                         'port': 22}
+        mock.client.connect.assert_called_once_with(**expected_conn)
+        self.assertLogMsg('Connecting to server')
+
+    @patch('paramiko.SSHClient', Mock)
+    def test_create_with_password_and_key(self):
+        conn_params = {'hostname': 'dummy.host.org',
+                       'username': 'ubuntu',
+                       'password': 'ubuntu',
+                       'key': 'id_rsa'}
+        mock = ParamikoSSHClient(**conn_params)
+        mock.connect()
+
+        expected_conn = {'username': 'ubuntu',
+                         'password': 'ubuntu',
+                         'allow_agent': False,
+                         'hostname': 'dummy.host.org',
+                         'look_for_keys': False,
+                         'key_filename': 'id_rsa',
+                         'port': 22}
+        mock.client.connect.assert_called_once_with(**expected_conn)
+        self.assertLogMsg('Connecting to server')
 
     @patch('paramiko.SSHClient', Mock)
     def test_create_without_credentials(self):
@@ -112,9 +219,12 @@ class ParamikoSSHClientTests(unittest.TestCase):
                                                           mode='w')
 
         mock.run(sd)
+
         # Make assertions over 'run' method
         mock_cli.get_transport().open_session().exec_command \
                 .assert_called_once_with(sd)
+        self.assertLogMsg('Executing command (cmd=/root/random_script.sh)')
+        self.assertLogMsg('Command finished')
 
         mock.close()
 
@@ -131,16 +241,25 @@ class ParamikoSSHClientTests(unittest.TestCase):
         mock.delete(sd)
         # Make assertions over the 'delete' method
         mock.client.open_sftp().unlink.assert_called_with(sd)
+        self.assertLogMsg('Deleting file')
 
         mock.close()
+        self.assertLogMsg('Closing server connection')
+
+    def assertLogMsg(self, expected_msg):
+        with open(self.tmp_file, 'r') as fp:
+            content = fp.read()
+
+        self.assertTrue(content.find(expected_msg) != -1)
 
 
 if not ParamikoSSHClient:
-    class ParamikoSSHClientTests(unittest.TestCase):
+    class ParamikoSSHClientTests(LibcloudTestCase):  # NOQA
         pass
 
 
-class ShellOutSSHClientTests(unittest.TestCase):
+class ShellOutSSHClientTests(LibcloudTestCase):
+
     def test_password_auth_not_supported(self):
         try:
             ShellOutSSHClient(hostname='localhost', username='foo',
@@ -193,9 +312,9 @@ class ShellOutSSHClientTests(unittest.TestCase):
 
         self.assertEqual(cmd1, ['ssh', 'root@localhost'])
         self.assertEqual(cmd2, ['ssh', '-i', '/home/my.key',
-                                 'root@localhost'])
+                                'root@localhost'])
         self.assertEqual(cmd3, ['ssh', '-i', '/home/my.key',
-                                 '-oConnectTimeout=5', 'root@localhost'])
+                                '-oConnectTimeout=5', 'root@localhost'])
 
 
 if __name__ == '__main__':

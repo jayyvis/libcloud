@@ -22,9 +22,13 @@ OpenNebula.org driver.
 
 __docformat__ = 'epytext'
 
-from xml.etree import ElementTree as ET
 from base64 import b64encode
 import hashlib
+
+try:
+    from lxml import etree as ET
+except ImportError:
+    from xml.etree import ElementTree as ET
 
 from libcloud.utils.py3 import httplib
 from libcloud.utils.py3 import next
@@ -221,7 +225,7 @@ class OpenNebulaNetwork(object):
     a driver and then have that create the network for you.
 
     >>> from libcloud.compute.drivers.dummy import DummyNodeDriver
-    >>> driver = DummyNetworkDriver()
+    >>> driver = DummyNodeDriver()
     >>> network = driver.create_network()
     >>> network = driver.list_networks()[0]
     >>> network.name
@@ -348,7 +352,7 @@ class OpenNebulaNodeDriver(NodeDriver):
                 if network.address:
                     ET.SubElement(networkGroup, 'NIC',
                                   {'network': '%s' % (str(network.id)),
-                                  'ip': network.address})
+                                   'ip': network.address})
                 else:
                     ET.SubElement(networkGroup, 'NIC',
                                   {'network': '%s' % (str(network.id))})
@@ -411,9 +415,9 @@ class OpenNebulaNodeDriver(NodeDriver):
         """
         List virtual networks on a provider.
 
-        :type  location: :class:`NodeLocation`
         :param location: Location from which to request a list of virtual
                          networks. (optional)
+        :type  location: :class:`NodeLocation`
 
         :return: List of virtual networks available to be connected to a
                  compute node.
@@ -647,7 +651,7 @@ class OpenNebula_1_4_NodeDriver(OpenNebulaNodeDriver):
     OpenNebula.org node driver for OpenNebula.org v1.4.
     """
 
-    pass
+    name = 'OpenNebula (v1.4)'
 
 
 class OpenNebula_2_0_NodeDriver(OpenNebulaNodeDriver):
@@ -655,6 +659,8 @@ class OpenNebula_2_0_NodeDriver(OpenNebulaNodeDriver):
     OpenNebula.org node driver for OpenNebula.org v2.0 through OpenNebula.org
     v2.2.
     """
+
+    name = 'OpenNebula (v2.0 - v2.2)'
 
     def create_node(self, **kwargs):
         """
@@ -951,6 +957,8 @@ class OpenNebula_3_0_NodeDriver(OpenNebula_2_0_NodeDriver):
     OpenNebula.org node driver for OpenNebula.org v3.0.
     """
 
+    name = 'OpenNebula (v3.0)'
+
     def ex_node_set_save_name(self, node, name):
         """
         Build action representation and instruct node to commit action.
@@ -1020,6 +1028,8 @@ class OpenNebula_3_2_NodeDriver(OpenNebula_3_0_NodeDriver):
     OpenNebula.org node driver for OpenNebula.org v3.2.
     """
 
+    name = 'OpenNebula (v3.2)'
+
     def reboot_node(self, node):
         return self.ex_node_action(node, ACTION.REBOOT)
 
@@ -1086,6 +1096,8 @@ class OpenNebula_3_6_NodeDriver(OpenNebula_3_2_NodeDriver):
     OpenNebula.org node driver for OpenNebula.org v3.6.
     """
 
+    name = 'OpenNebula (v3.6)'
+
     def create_volume(self, size, name, location=None, snapshot=None):
         storage = ET.Element('STORAGE')
 
@@ -1112,7 +1124,8 @@ class OpenNebula_3_6_NodeDriver(OpenNebula_3_2_NodeDriver):
 
         xml = ET.tostring(storage)
         volume = self.connection.request('/storage',
-            { 'occixml': xml }, method='POST').object
+                                         {'occixml': xml},
+                                         method='POST').object
 
         return self._to_volume(volume)
 
@@ -1196,13 +1209,15 @@ class OpenNebula_3_6_NodeDriver(OpenNebula_3_2_NodeDriver):
             volumes.append(self._to_volume(
                 self.connection.request('/storage/%s' % storage_id).object))
 
-        return  volumes
+        return volumes
+
 
 class OpenNebula_3_8_NodeDriver(OpenNebula_3_6_NodeDriver):
     """
     OpenNebula.org node driver for OpenNebula.org v3.8.
     """
 
+    name = 'OpenNebula (v3.8)'
     plain_auth = API_PLAIN_AUTH
 
     def _to_sizes(self, object):

@@ -26,7 +26,7 @@ from libcloud.loadbalancer.drivers.gce import (GCELBDriver)
 from libcloud.test.common.test_google import GoogleAuthMockHttp
 from libcloud.test.compute.test_gce import GCEMockHttp
 
-from libcloud.test import MockHttpTestCase, LibcloudTestCase
+from libcloud.test import LibcloudTestCase
 
 from libcloud.test.secrets import GCE_PARAMS, GCE_KEYWORD_PARAMS
 
@@ -50,7 +50,7 @@ class GCELoadBalancerTest(LibcloudTestCase):
         self.driver = GCELBDriver(*GCE_PARAMS, **kwargs)
 
     def test_get_node_from_ip(self):
-        ip = '173.255.115.146'
+        ip = '23.236.58.15'
         expected_name = 'node-name'
         node = self.driver._get_node_from_ip(ip)
         self.assertEqual(node.name, expected_name)
@@ -111,10 +111,10 @@ class GCELoadBalancerTest(LibcloudTestCase):
         balancer = self.driver.get_balancer('lcforwardingrule')
         member = self.driver._node_to_member(node, balancer)
         # Detach member first
-        detach_member = balancer.detach_member(member)
+        balancer.detach_member(member)
         self.assertEqual(len(balancer.list_members()), 1)
         # Attach Node
-        attach_node = balancer.attach_compute_node(node)
+        balancer.attach_compute_node(node)
         self.assertEqual(len(balancer.list_members()), 2)
 
     def test_detach_attach_member(self):
@@ -127,11 +127,11 @@ class GCELoadBalancerTest(LibcloudTestCase):
         self.assertEqual(len(balancer.list_members()), 2)
 
         # Remove a member and check that it now has 1 member
-        detach_member = balancer.detach_member(member)
+        balancer.detach_member(member)
         self.assertEqual(len(balancer.list_members()), 1)
 
         # Reattach member and check that it has 2 members again
-        attach_member = balancer.attach_member(member)
+        balancer.attach_member(member)
         self.assertEqual(len(balancer.list_members()), 2)
 
     def test_balancer_list_members(self):
@@ -139,7 +139,7 @@ class GCELoadBalancerTest(LibcloudTestCase):
         members = balancer.list_members()
         self.assertEqual(len(members), 2)
         member_ips = [m.ip for m in members]
-        self.assertTrue('173.255.113.234' in member_ips)
+        self.assertTrue('23.236.58.15' in member_ips)
 
     def test_ex_create_healthcheck(self):
         healthcheck_name = 'lchealthcheck'
@@ -158,7 +158,7 @@ class GCELoadBalancerTest(LibcloudTestCase):
 
     def test_ex_list_healthchecks(self):
         healthchecks = self.driver.ex_list_healthchecks()
-        self.assertEqual(len(healthchecks), 2)
+        self.assertEqual(len(healthchecks), 3)
         self.assertEqual(healthchecks[0].name, 'basic-check')
 
     def test_ex_balancer_detach_attach_healthcheck(self):

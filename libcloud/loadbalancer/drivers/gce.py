@@ -16,7 +16,7 @@
 try:
     import simplejson as json
 except ImportError:
-    import json
+    import json  # NOQA
 
 from libcloud.loadbalancer.base import LoadBalancer, Member, Driver, Algorithm
 from libcloud.compute.drivers.gce import GCEConnection, GCENodeDriver
@@ -30,8 +30,8 @@ DEFAULT_ALGORITHM = Algorithm.RANDOM
 class GCELBDriver(Driver):
     connectionCls = GCEConnection
     apiname = 'googleapis'
-    name = 'Google Compute Engine'
-    website = 'https://www.googleapis.com/'
+    name = 'Google Compute Engine Load Balancer'
+    website = 'https://cloud.google.com/'
 
     _VALUE_TO_ALGORITHM_MAP = {
         'RANDOM': Algorithm.RANDOM
@@ -89,7 +89,8 @@ class GCELBDriver(Driver):
         return balancers
 
     def create_balancer(self, name, port, protocol, algorithm, members,
-                        ex_region=None, ex_healthchecks=None, ex_address=None):
+                        ex_region=None, ex_healthchecks=None, ex_address=None,
+                        ex_session_affinity=None):
         """
         Create a new load balancer instance.
 
@@ -97,7 +98,7 @@ class GCELBDriver(Driver):
         pool, then adding the members to the target pool.
 
         :param  name: Name of the new load balancer (required)
-        :type   ``str``
+        :type   name: ``str``
 
         :param  port: Port or range of ports the load balancer should listen
                       on, defaults to all ports.  Examples: '80', '5000-5999'
@@ -125,17 +126,22 @@ class GCELBDriver(Driver):
 
         :keyword  ex_healthchecks: Optional list of healthcheck objects or
                                    names to add to the load balancer.
-        :type     ex_healthchecks: ``list`` of :class:`GCEHealthCheck` or ``str``
+        :type     ex_healthchecks: ``list`` of :class:`GCEHealthCheck` or
+                                   ``list`` of ``str``
 
         :keyword  ex_address: Optional static address object to be assigned to
                               the load balancer.
         :type     ex_address: C{GCEAddress}
 
+        :keyword  ex_session_affinity: Optional algorithm to use for session
+                                       affinity.  This will modify the hashing
+                                       algorithm such that a client will tend
+                                       to stick to a particular Member.
+        :type     ex_session_affinity: ``str``
+
         :return:  LoadBalancer object
         :rtype:   :class:`LoadBalancer`
         """
-        unused = algorithm
-
         node_list = []
         for member in members:
             # Member object
@@ -155,7 +161,7 @@ class GCELBDriver(Driver):
         tp_name = '%s-tp' % name
         targetpool = self.gce.ex_create_targetpool(
             tp_name, region=ex_region, healthchecks=ex_healthchecks,
-            nodes=node_list)
+            nodes=node_list, session_affinity=ex_session_affinity)
 
         # Create the Forwarding rule, but if it fails, delete the target pool.
         try:

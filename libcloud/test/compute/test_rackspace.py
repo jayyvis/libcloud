@@ -19,7 +19,6 @@ from libcloud.utils.py3 import method_type
 from libcloud.utils.py3 import httplib
 from libcloud.compute.providers import DEPRECATED_RACKSPACE_PROVIDERS
 from libcloud.compute.providers import get_driver
-from libcloud.common.rackspace import AUTH_URL
 from libcloud.compute.drivers.rackspace import RackspaceFirstGenNodeDriver
 from libcloud.compute.drivers.rackspace import RackspaceNodeDriver
 from libcloud.test.compute.test_openstack import OpenStack_1_0_Tests
@@ -74,6 +73,7 @@ class RackspaceusFirstGenUkTests(OpenStack_1_0_Tests):
 
 
 class RackspaceNovaMockHttp(OpenStack_1_1_MockHttp):
+
     def __init__(self, *args, **kwargs):
         super(RackspaceNovaMockHttp, self).__init__(*args, **kwargs)
 
@@ -119,7 +119,7 @@ class RackspaceNovaLonMockHttp(RackspaceNovaMockHttp):
 
 class BaseRackspaceNovaTestCase(object):
     conn_classes = (RackspaceNovaMockHttp, RackspaceNovaMockHttp)
-    auth_url = 'https://auth.api.example.com/v2.0/'
+    auth_url = 'https://auth.api.example.com'
 
     def create_driver(self):
         return self.driver_type(*self.driver_args, **self.driver_kwargs)
@@ -185,7 +185,7 @@ class RackspaceNovaLonTests(BaseRackspaceNovaTestCase, OpenStack_1_1_Tests):
     driver_kwargs = {'region': 'lon'}
 
     conn_classes = (RackspaceNovaLonMockHttp, RackspaceNovaLonMockHttp)
-    auth_url = 'https://lon.auth.api.example.com/v2.0/'
+    auth_url = 'https://lon.auth.api.example.com'
 
     expected_endpoint = 'https://lon.servers.api.rackspacecloud.com/v2/1337'
 
@@ -198,6 +198,16 @@ class RackspaceNovaSydTests(BaseRackspaceNovaTestCase, OpenStack_1_1_Tests):
     driver_kwargs = {'region': 'syd'}
 
     expected_endpoint = 'https://syd.servers.api.rackspacecloud.com/v2/1337'
+
+
+class RackspaceNovaHkgTests(BaseRackspaceNovaTestCase, OpenStack_1_1_Tests):
+
+    driver_klass = RackspaceNodeDriver
+    driver_type = RackspaceNodeDriver
+    driver_args = RACKSPACE_NOVA_PARAMS
+    driver_kwargs = {'region': 'hkg'}
+
+    expected_endpoint = 'https://hkg.servers.api.rackspacecloud.com/v2/1337'
 
 if __name__ == '__main__':
     sys.exit(unittest.main())
